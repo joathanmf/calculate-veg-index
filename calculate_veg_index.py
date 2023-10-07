@@ -170,20 +170,28 @@ if __name__ == "__main__":
     username = os.getenv("username")
     password = os.getenv("password")
 
+    # Instanciando a classe VegetativeIndexProcessor passando as credenciais
     processor = VegetativeIndexProcessor(username, password)
 
+    # Definindo o arquivo que contém as coordenadas
     processor.set_file("file.geojson")
+
+    # Definindo as datas de início e fim, respectivamente
     processor.set_date("2023-09-01", "2023-10-01")
 
+    # Cálculo do NDVI e salvando em um arquivo tiff
     ndvi = processor.calculate_ndvi()
     processor.save(ndvi, "ndvi")
 
+    # Cálculo do RECI e salvando em um arquivo tiff
     reci = processor.calculate_reci()
     processor.save(reci, "reci")
 
+    # Cálculo do MSAVI e salvando em um arquivo tiff
     msavi = processor.calculate_msavi()
     processor.save(msavi, "msavi")
 
+    # Exibindo na tela usando a função 'plot'
     processor.plot(ndvi)
     processor.plot(reci)
     processor.plot(msavi)
