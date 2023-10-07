@@ -1,4 +1,4 @@
-## Calculando os Índices Vegetativos com Python (título)
+## Calculando os Índices Vegetativos com Python
 
 #### Passo 1
 Instanciar a classe passando o usuário e senha para a conexão com a API Sentinel
