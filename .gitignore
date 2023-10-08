@@ -1,2 +1,4 @@
+*.SAFE
 .vscode
 .env
+*.tiff
