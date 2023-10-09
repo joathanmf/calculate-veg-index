@@ -22,11 +22,11 @@ class VegetativeIndexProcessor:
     red_transform = None
     start_date = None
     end_date = None
+    cloud = None
 
     def __init__(self, username, password):
         print("-> Configuração da API Sentinel")
         sentinel_api = os.getenv("sent_api")
-
         self.api = SentinelAPI(username, password, sentinel_api)
 
     def set_date(self, start_date, end_date):
@@ -35,6 +35,9 @@ class VegetativeIndexProcessor:
 
     def set_file(self, file):
         self.file = file
+
+    def set_cloud(self, value):
+        self.cloud = int(value)
 
     def crop_area(self):
         with open(self.file) as file:
@@ -53,8 +56,9 @@ class VegetativeIndexProcessor:
             date=(self.start_date, self.end_date),
             platformname="Sentinel-2",
             processinglevel="Level-2A",
-            cloudcoverpercentage=(0, 30),
+            cloudcoverpercentage=(0, self.cloud),
         )
+
         products_gdf = self.api.to_geodataframe(products)
         products_gdf = products_gdf.sort_values(
             ["cloudcoverpercentage"], ascending=[True]
@@ -178,6 +182,9 @@ if __name__ == "__main__":
 
     # Definindo as datas de início e fim, respectivamente
     processor.set_date("2023-09-01", "2023-10-01")
+
+    # Definindo a porcentagem máxima de núvens
+    processor.set_cloud(30)
 
     # Cálculo do NDVI e salvando em um arquivo tiff
     ndvi = processor.calculate_ndvi()
