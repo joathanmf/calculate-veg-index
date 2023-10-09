@@ -16,7 +16,7 @@ Defina as datas de início e fim, respectivamente
 processor.set_date("2023-09-01", "2023-10-01")
 ```
 #### Passo 4
-Defina a porcentagem máxima de nuvens para a consulta
+Defina a porcentagem máxima de nuvens
 ```python
 processor.set_cloud(30)
 ```
