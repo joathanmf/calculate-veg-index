@@ -16,6 +16,11 @@ Defina as datas de início e fim, respectivamente
 processor.set_date("2023-09-01", "2023-10-01")
 ```
 #### Passo 4
+Defina a porcentagem máxima de nuvens para a consulta
+```python
+processor.set_cloud(30)
+```
+#### Passo 5
 Calculando os índices vegetativos
 ```python
 ndvi = processor.calculate_ndvi()
@@ -24,7 +29,7 @@ msavi = processor.calculate_msavi()
 ```
 O retorno de cada função é o indice calculado
 
-#### Passo 5
+#### Passo 6
 Salvar ou exibir a imagem calculada usando as funções `save` e `plot`
 ```python
 processor.save(ndvi, "nome_de_saída")
