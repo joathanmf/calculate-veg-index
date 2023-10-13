@@ -155,13 +155,6 @@ class VegetativeIndexProcessor:
 
         return ndvi
 
-    def calculate_reci(self):
-        red, nir, epsilon = self.crop_area()
-
-        reci = (nir / (red + epsilon)) - 1
-
-        return reci
-
     def calculate_msavi(self):
         red, nir, _ = self.crop_area()
 
@@ -190,15 +183,10 @@ if __name__ == "__main__":
     ndvi = processor.calculate_ndvi()
     processor.save(ndvi, "ndvi")
 
-    # Cálculo do RECI e salvando em um arquivo tiff
-    reci = processor.calculate_reci()
-    processor.save(reci, "reci")
-
     # Cálculo do MSAVI e salvando em um arquivo tiff
     msavi = processor.calculate_msavi()
     processor.save(msavi, "msavi")
 
     # Exibindo na tela usando a função 'plot'
     processor.plot(ndvi)
-    processor.plot(reci)
     processor.plot(msavi)
