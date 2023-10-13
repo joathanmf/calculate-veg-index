@@ -24,7 +24,6 @@ processor.set_cloud(30)
 Calculando os índices vegetativos
 ```python
 ndvi = processor.calculate_ndvi()
-reci = processor.calculate_reci()
 msavi = processor.calculate_msavi()
 ```
 O retorno de cada função é o indice calculado
