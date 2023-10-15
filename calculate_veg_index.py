@@ -174,7 +174,7 @@ if __name__ == "__main__":
     processor.set_file("file.geojson")
 
     # Definindo as datas de início e fim, respectivamente
-    processor.set_date("2023-09-01", "2023-10-01")
+    processor.set_date("2023-09-10", "2023-10-10")
 
     # Definindo a porcentagem máxima de núvens
     processor.set_cloud(30)
