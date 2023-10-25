@@ -21,6 +21,12 @@ Defina a porcentagem máxima de nuvens
 processor.set_cloud(30)
 ```
 #### Passo 5
+Download e mask das imagens
+```python
+processor.download()
+processor.mask_area()
+```
+#### Passo 6
 Calculando os índices vegetativos
 ```python
 ndvi = processor.calculate_ndvi()
@@ -28,9 +34,8 @@ msavi = processor.calculate_msavi()
 ```
 O retorno de cada função é o indice calculado
 
-#### Passo 6
-Salvar ou exibir a imagem calculada usando as funções `save` e `plot`
+#### Passo 7
+Salvar e exibir a imagem calculada usando as funções e `plot`
 ```python
-processor.save(ndvi, "nome_de_saída")
 processor.plot(ndvi)
 ```

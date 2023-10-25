@@ -1,4 +1,7 @@
 *.SAFE
+*.tiff
+*.png
 .vscode
 .env
-*.tiff
+calc.py
+dados.geojson

@@ -1,6 +1,7 @@
 from sentinelsat import SentinelAPI, geojson_to_wkt, make_path_filter
 from rasterio.warp import transform_geom
 from shapely.geometry import Polygon
+import matplotlib.pyplot as plt
 from rasterio.mask import mask
 from dotenv import load_dotenv
 from datetime import datetime
@@ -8,26 +9,22 @@ from rasterio import plot
 import numpy as np
 import rasterio
 import pyproj
+import shutil
 import json
+import math
 import glob
+import sys
 import os
 
 load_dotenv()
 
 
 class VegetativeIndexProcessor:
-    file = None
-    src_crs = None
-    kwargs = None
-    red_transform = None
-    start_date = None
-    end_date = None
-    cloud = None
-
     def __init__(self, username, password):
-        print("-> Configuração da API Sentinel")
-        sentinel_api = os.getenv("sent_api")
-        self.api = SentinelAPI(username, password, sentinel_api)
+        print("-> Configurando a API")
+        self.api = SentinelAPI(username, password)
+
+        # self.remove_folders()
 
     def set_date(self, start_date, end_date):
         self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
@@ -39,7 +36,18 @@ class VegetativeIndexProcessor:
     def set_cloud(self, value):
         self.cloud = int(value)
 
-    def crop_area(self):
+    def remove_folders():
+        diretorio_atual = os.getcwd()
+        for root, dirs, _ in os.walk(diretorio_atual):
+            for dir in dirs:
+                if dir.endswith(".SAFE"):
+                    try:
+                        shutil.rmtree(os.path.join(root, dir))
+                        print(f"--> Pasta {dir} excluída com sucesso.")
+                    except Exception as e:
+                        print(f"--> Erro ao excluir a pasta {dir}: {e}")
+
+    def download(self):
         with open(self.file) as file:
             data = json.load(file)
 
@@ -47,9 +55,9 @@ class VegetativeIndexProcessor:
         coords = data["features"][0]["geometry"]["coordinates"][0]
 
         # Converte para o padrão polygon
-        polygon = Polygon(coords)
+        self.polygon = Polygon(coords)
 
-        footprint = geojson_to_wkt(polygon.__geo_interface__)
+        footprint = geojson_to_wkt(self.polygon.__geo_interface__)
 
         products = self.api.query(
             footprint,
@@ -60,29 +68,48 @@ class VegetativeIndexProcessor:
         )
 
         products_gdf = self.api.to_geodataframe(products)
-        products_gdf = products_gdf.sort_values(
-            ["cloudcoverpercentage"], ascending=[True]
-        )
+        products_gdf.to_file("dados.geojson", driver="GeoJSON")
 
-        products_gdf = products_gdf.head(1)
-        product_id = products_gdf.index.values[0]
+        product_ids = list(products_gdf.index)
 
         path_filter_band_04 = make_path_filter(f"*_B04_10m.jp2")
         path_filter_band_08 = make_path_filter(f"*_B08_10m.jp2")
 
-        print("-> Download das bandas")
-        self.api.download(product_id, nodefilter=path_filter_band_04)
-        self.api.download(product_id, nodefilter=path_filter_band_08)
+        print("-> Baixando as imagens")
+        for idx in product_ids:
+            try:
+                self.api.download(idx, nodefilter=path_filter_band_04)
+                self.api.download(idx, nodefilter=path_filter_band_08)
+            except:
+                print(f"--> Erro ao baixar imagem ({idx})")
 
-        band_04_file = glob.glob("**/*_B04_10m.jp2", recursive=True)
-        band_08_file = glob.glob("**/*_B08_10m.jp2", recursive=True)
-
+    def mask_area(self):
         # Extrair as coordenadas do anel externo do polígono
-        exterior_coords = polygon.exterior.coords
+        exterior_coords = self.polygon.exterior.coords
 
-        # Define o sistema de referência espacial da imagem raster
-        with rasterio.open(band_04_file[0]) as src:
-            dst_crs = src.crs
+        self.epsilon = 0.00001
+
+        root_dir = os.getcwd()
+        band_04_files = []
+        band_08_files = []
+
+        for dirpath, _, filenames in os.walk(root_dir):
+            for filename in filenames:
+                if "_B04_10m.jp2" in filename:
+                    band_04_files.append(os.path.join(dirpath, filename))
+                elif "_B08_10m.jp2" in filename:
+                    band_08_files.append(os.path.join(dirpath, filename))
+
+        self.extract_dates(band_04_files)
+
+        try:
+            # Define o sistema de referência espacial da imagem raster
+            with rasterio.open(band_04_files[0]) as src:
+                dst_crs = src.crs
+        except:
+            print("--> Nenhuma banda encontrada")
+            print("--> Saindo...")
+            sys.exit()
 
         # Define o sistema de referência espacial das coordenadas do polígono (WGS84)
         self.src_crs = pyproj.CRS.from_epsg(4326)
@@ -92,75 +119,98 @@ class VegetativeIndexProcessor:
             self.src_crs, dst_crs, {"type": "Polygon", "coordinates": [exterior_coords]}
         )
 
-        print("-> Cortando a imagem")
-        with rasterio.open(band_04_file[0]) as red:
-            with rasterio.open(band_08_file[0]) as nir:
-                self.kwargs = red.meta.copy()
+        red_crops = []
+        nir_crops = []
 
-                red_crop, self.red_transform = mask(
-                    red,
-                    [transformed_coords],
-                    invert=False,
-                    crop=True,
-                    nodata=0,
-                    filled=True,
-                )
-                nir_crop, _ = mask(
-                    nir,
-                    [transformed_coords],
-                    invert=False,
-                    crop=True,
-                    nodata=0,
-                    filled=True,
-                )
+        print("-> Cortando as imagens")
+        for idx in range(len(band_04_files)):
+            with rasterio.open(band_04_files[idx]) as red:
+                with rasterio.open(band_08_files[idx]) as nir:
+                    self.kwargs = red.meta.copy()
 
-                # Pequena constante para evitar divisões por zero
-                epsilon = 1e-6
+                    red_crop, self.red_transform = mask(
+                        red,
+                        [transformed_coords],
+                        crop=True,
+                    )
+                    nir_crop, _ = mask(
+                        nir,
+                        [transformed_coords],
+                        crop=True,
+                    )
 
-                return red_crop, nir_crop, epsilon
+                    red_crops.append(red_crop)
+                    nir_crops.append(nir_crop)
 
-    def plot(self, index):
-        print("-> Exibindo imagem")
-        plot.show(index)
-
-    def save(self, index, name):
-        print(f'-> Salvando imagem "{name}.tiff"')
-        self.kwargs.update(
-            {"driver": "GTiff", "count": 1, "compress": "lzw", "crs": "EPSG:4326"}
-        )
-
-        _, height, width = index.shape
-
-        # Salvar a matriz em um arquivo tiff
-        with rasterio.open(
-            f"{name}.tiff",
-            "w",
-            driver="GTiff",
-            height=height,
-            width=width,
-            count=1,
-            dtype=np.float32,
-            crs=self.src_crs,
-            transform=self.red_transform,
-            nodata=None,
-        ) as dst:
-            dst.write(index)
-
-        print("-> Salvamento concluído")
+        self.bands = [red_crops, nir_crops]
 
     def calculate_ndvi(self):
-        red, nir, epsilon = self.crop_area()
-
-        ndvi = (nir - red) / (nir + red + epsilon)
+        red, nir = self.bands
+        ndvi = []
+        for i in range(len(red)):
+            ndvi.append((nir[i] - red[i]) / (nir[i] + red[i] + self.epsilon))
 
         return ndvi
 
     def calculate_msavi(self):
-        red, nir, _ = self.crop_area()
-
-        msavi = (2 * nir + 1 - np.sqrt((2 * nir + 1) ** 2 - 8 * (nir - red))) / 2
+        red, nir = self.bands
+        msavi = []
+        for i in range(len(red)):
+            msavi.append(
+                (
+                    2 * nir[i]
+                    + 1
+                    - np.sqrt((2 * nir[i] + 1) ** 2 - 8 * (nir[i] - red[i]))
+                )
+                / 2
+            )
 
         return msavi
+
+    def extract_dates(self, files):
+        self.dates = []
+        for file in files:
+            partes = file.split("_")
+            data_str = partes[2]
+            data_formatada = datetime.strptime(data_str, "%Y%m%dT%H%M%S")
+            self.dates.append(data_formatada)
+
+    def plot(self, *, index, name):
+        name = name.upper()
+        print(f"-> Exibindo os cálculos do {name}")
+        qtd = len(index)
+
+        maximo = np.max(index)
+
+        if maximo > 100 or name == "MSAVI":
+            minimo = np.min(index)
+            index = [(x - minimo) / (maximo - minimo) for x in index]
+
+        num_colunas = math.ceil(math.sqrt(qtd))
+        num_linhas = math.ceil(qtd / num_colunas)
+
+        # Criar os subplots
+        fig, axs = plt.subplots(num_linhas, num_colunas, figsize=(10, 5))
+
+        # Remover subplots extras (se houver)
+        if qtd < num_linhas * num_colunas:
+            for i in range(qtd, num_linhas * num_colunas):
+                fig.delaxes(axs.flatten()[i])
+
+        # Adicionar cada imagem ao subplot correspondente
+        for i, ax in enumerate(axs.flatten()):
+            if i < qtd:
+                ax.imshow(index[i].squeeze(), cmap="viridis", vmax=0.72)
+                ax.set_title(f"{name} {i+1} {self.dates[i]}")
+            else:
+                if ax in fig.axes:
+                    fig.delaxes(ax)
+
+        # Ajustar layout
+        plt.tight_layout()
+
+        # Exibir o gráfico
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -174,19 +224,18 @@ if __name__ == "__main__":
     processor.set_file("file.geojson")
 
     # Definindo as datas de início e fim, respectivamente
-    processor.set_date("2023-09-10", "2023-10-10")
+    processor.set_date("2023-03-15", "2023-04-15")
 
     # Definindo a porcentagem máxima de núvens
     processor.set_cloud(30)
 
-    # Cálculo do NDVI e salvando em um arquivo tiff
+    processor.download()
+    processor.mask_area()
+
+    # Cálculo do NDVI e MSAVI
     ndvi = processor.calculate_ndvi()
-    processor.save(ndvi, "ndvi")
-
-    # Cálculo do MSAVI e salvando em um arquivo tiff
     msavi = processor.calculate_msavi()
-    processor.save(msavi, "msavi")
 
-    # Exibindo na tela usando a função 'plot'
-    processor.plot(ndvi)
-    processor.plot(msavi)
+    # Passar o nome corretamente
+    processor.plot(index=ndvi, name="ndvi")
+    processor.plot(index=msavi, name="msavi")
