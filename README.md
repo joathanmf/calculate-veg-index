@@ -37,5 +37,5 @@ O retorno de cada função é o indice calculado
 #### Passo 7
 Salvar e exibir a imagem calculada usando as funções e `plot`
 ```python
-processor.plot(ndvi)
+processor.plot(index=ndvi, name="ndvi")
 ```
