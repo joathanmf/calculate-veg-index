@@ -24,8 +24,6 @@ class VegetativeIndexProcessor:
         print("-> Configurando a API")
         self.api = SentinelAPI(username, password)
 
-        # self.remove_folders()
-
     def set_date(self, start_date, end_date):
         self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
         self.end_date = datetime.strptime(end_date, "%Y-%m-%d")
@@ -35,17 +33,6 @@ class VegetativeIndexProcessor:
 
     def set_cloud(self, value):
         self.cloud = int(value)
-
-    def remove_folders():
-        diretorio_atual = os.getcwd()
-        for root, dirs, _ in os.walk(diretorio_atual):
-            for dir in dirs:
-                if dir.endswith(".SAFE"):
-                    try:
-                        shutil.rmtree(os.path.join(root, dir))
-                        print(f"--> Pasta {dir} excluída com sucesso.")
-                    except Exception as e:
-                        print(f"--> Erro ao excluir a pasta {dir}: {e}")
 
     def download(self):
         with open(self.file) as file:
@@ -102,12 +89,26 @@ class VegetativeIndexProcessor:
 
         self.extract_dates(band_04_files)
 
+        temp_dates = []
+        temp_band_04_files = []
+        temp_band_08_files = []
+
+        for idx, date in enumerate(self.dates):
+            if self.start_date <= date <= self.end_date:
+                temp_dates.append(date)
+                temp_band_04_files.append(band_04_files[idx])
+                temp_band_08_files.append(band_08_files[idx])
+
+        self.dates = temp_dates
+        band_04_files = temp_band_04_files
+        band_08_files = temp_band_08_files
+
         try:
             # Define o sistema de referência espacial da imagem raster
             with rasterio.open(band_04_files[0]) as src:
                 dst_crs = src.crs
         except:
-            print("--> Nenhuma banda encontrada")
+            print("--> Nenhuma imagem encontrada nesse período")
             print("--> Saindo...")
             sys.exit()
 
@@ -224,7 +225,7 @@ if __name__ == "__main__":
     processor.set_file("file.geojson")
 
     # Definindo as datas de início e fim, respectivamente
-    processor.set_date("2023-03-15", "2023-04-15")
+    processor.set_date("2022-03-15", "2022-04-15")
 
     # Definindo a porcentagem máxima de núvens
     processor.set_cloud(30)
