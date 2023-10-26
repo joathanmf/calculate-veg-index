@@ -172,6 +172,18 @@ class VegetativeIndexProcessor:
         self.band_04_files = temp_band_04
         self.band_08_files = temp_band_08
 
+        self.sort_dates()
+
+    def sort_dates(self):
+        # Cria uma lista de tuplas, onde cada tupla contém uma data e os arquivos correspondentes
+        data_and_files = list(zip(self.dates, self.band_04_files, self.band_08_files))
+
+        # Ordena a lista com base nas datas
+        data_and_files.sort(key=lambda x: x[0])
+
+        # Desagrupa os elementos novamente
+        self.dates, self.band_04_files, self.band_08_files = zip(*data_and_files)
+
     def plot(self, *, index, name):
         name = name.upper()
         print(f"-> Exibindo os cálculos do {name}")
@@ -221,7 +233,7 @@ if __name__ == "__main__":
     processor.set_file("file.geojson")
 
     # Definindo as datas de início e fim, respectivamente
-    processor.set_date("2022-03-15", "2022-04-15")
+    processor.set_date("2023-01-15", "2023-03-15")
 
     # Definindo a porcentagem máxima de núvens
     processor.set_cloud(30)
