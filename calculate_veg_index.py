@@ -77,35 +77,21 @@ class VegetativeIndexProcessor:
         self.epsilon = 0.00001
 
         root_dir = os.getcwd()
-        band_04_files = []
-        band_08_files = []
+        self.band_04_files = []
+        self.band_08_files = []
 
         for dirpath, _, filenames in os.walk(root_dir):
             for filename in filenames:
                 if "_B04_10m.jp2" in filename:
-                    band_04_files.append(os.path.join(dirpath, filename))
+                    self.band_04_files.append(os.path.join(dirpath, filename))
                 elif "_B08_10m.jp2" in filename:
-                    band_08_files.append(os.path.join(dirpath, filename))
+                    self.band_08_files.append(os.path.join(dirpath, filename))
 
-        self.extract_dates(band_04_files)
-
-        temp_dates = []
-        temp_band_04_files = []
-        temp_band_08_files = []
-
-        for idx, date in enumerate(self.dates):
-            if self.start_date <= date <= self.end_date:
-                temp_dates.append(date)
-                temp_band_04_files.append(band_04_files[idx])
-                temp_band_08_files.append(band_08_files[idx])
-
-        self.dates = temp_dates
-        band_04_files = temp_band_04_files
-        band_08_files = temp_band_08_files
+        self.extract_dates()
 
         try:
             # Define o sistema de referência espacial da imagem raster
-            with rasterio.open(band_04_files[0]) as src:
+            with rasterio.open(self.band_04_files[0]) as src:
                 dst_crs = src.crs
         except:
             print("--> Nenhuma imagem encontrada nesse período")
@@ -124,9 +110,9 @@ class VegetativeIndexProcessor:
         nir_crops = []
 
         print("-> Cortando as imagens")
-        for idx in range(len(band_04_files)):
-            with rasterio.open(band_04_files[idx]) as red:
-                with rasterio.open(band_08_files[idx]) as nir:
+        for idx in range(len(self.band_04_files)):
+            with rasterio.open(self.band_04_files[idx]) as red:
+                with rasterio.open(self.band_08_files[idx]) as nir:
                     self.kwargs = red.meta.copy()
 
                     red_crop, self.red_transform = mask(
@@ -168,13 +154,23 @@ class VegetativeIndexProcessor:
 
         return msavi
 
-    def extract_dates(self, files):
+    def extract_dates(self):
         self.dates = []
-        for file in files:
+        temp_band_04 = []
+        temp_band_08 = []
+
+        for file in self.band_04_files:
             partes = file.split("_")
             data_str = partes[2]
             data_formatada = datetime.strptime(data_str, "%Y%m%dT%H%M%S")
-            self.dates.append(data_formatada)
+
+            if self.start_date <= data_formatada <= self.end_date:
+                self.dates.append(data_formatada)
+                temp_band_04.append(file)
+                temp_band_08.append(self.band_08_files[len(temp_band_04) - 1])
+
+        self.band_04_files = temp_band_04
+        self.band_08_files = temp_band_08
 
     def plot(self, *, index, name):
         name = name.upper()
